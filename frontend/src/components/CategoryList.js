@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function CategoryList() {
   const [categories, setCategories] = useState([])
+  const [error, setError] = useState(null)
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -15,32 +16,39 @@ export default function CategoryList() {
     } else {
       fetchCategories();
     }
-  }, []);
+  }, [navigate]);
 
   const fetchCategories = async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get('http://localhost:3335/api/v1/categories', {
         headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-      setCategories(response.data)
+          Authorization: `Bearer ${token}`, // Token obtido diretamente
+        },
+      });
+      setCategories(response.data);
+      setError(null);
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      console.error('Error fetching categories:', error);
     }
-  }
+  };
 
   const deleteCategory = async (id) => {
     if (window.confirm('Are you sure you want to delete this category?')) {
       try {
-        await axios.delete(`http://localhost:3335/api/v1/categories/${id}`)
-        fetchCategories()
+        const token = localStorage.getItem('token');
+        await axios.delete(`http://localhost:3335/api/v1/categories/${id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        fetchCategories();
+        setError(null); 
       } catch (error) {
-        console.error('Error deleting category:', error)
+        console.error('Error deleting category:', error);
       }
     }
-  }
+  };
 
   return (
     <div>

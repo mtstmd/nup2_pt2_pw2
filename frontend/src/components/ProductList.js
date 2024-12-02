@@ -1,44 +1,63 @@
 import React, { useState, useEffect } from 'react'
 import { Table, Button, Image } from 'react-bootstrap'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 
 export default function ProductList() {
   const [products, setProducts] = useState([])
   const [error, setError] = useState(null)
-
+  const navigate = useNavigate()
+  
   useEffect(() => {
-    fetchProducts()
-  }, [])
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login', { state: { error: 'Você precisa estar autenticado para acessar esta página.' } });
+    } else {
+      fetchProducts();
+    }
+  }, [navigate]);
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get('http://localhost:3335/api/v1/products')
-      console.log('API Response:', response.data)
-      
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:3335/api/v1/products', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log('API Response:', response.data);
+
       if (response.data && Array.isArray(response.data)) {
-        setProducts(response.data)
+        setProducts(response.data);
+        setError(null); // Reseta o erro caso a chamada seja bem-sucedida
       } else {
-        setError('Unexpected data format received from the API')
+        setError('Unexpected data format received from the API');
       }
     } catch (error) {
-      console.error('Error fetching products:', error)
-      setError('Failed to fetch products. Please try again later.')
+      console.error('Error fetching products:', error);
+      setError('Failed to fetch products. Please try again later.');
     }
-  }
+  };
 
   const deleteProduct = async (id) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        await axios.delete(`http://localhost:3335/api/v1/products/${id}`)
-        fetchProducts()
+        const token = localStorage.getItem('token');
+        await axios.delete(`http://localhost:3335/api/v1/products/${id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        fetchProducts();
+        setError(null); 
       } catch (error) {
-        console.error('Error deleting product:', error)
-        setError('Failed to delete product. Please try again later.')
+        console.error('Error deleting product:', error);
+        setError('Failed to delete product. Please try again later.');
       }
     }
-  }
-
+  };
+  
   if (error) {
     return <div className="alert alert-danger">{error}</div>
   }

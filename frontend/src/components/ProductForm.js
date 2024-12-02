@@ -19,50 +19,78 @@ export default function ProductForm() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchCategories()
-    if (id) {
-      fetchProduct()
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login', { state: { error: 'Você precisa estar autenticado para acessar esta página.' } });
+    } else {
+      fetchCategories();
+      if (id) {
+        fetchProduct();
+      }
     }
-  }, [id])
+  }, [id, navigate]);
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get('http://localhost:3335/api/v1/categories')
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:3335/api/v1/categories', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
       if (Array.isArray(response.data)) {
-        setCategories(response.data)
+        setCategories(response.data);
+        setError(null);
       } else {
-        setError('Unexpected data format received from the categories API')
+        setError('Unexpected data format received from the categories API');
       }
     } catch (error) {
-      console.error('Error fetching categories:', error)
-      setError('Failed to fetch categories. Please try again later.')
+      console.error('Error fetching categories:', error);
+      setError('Failed to fetch categories. Please try again later.');
     }
-  }
+  };
 
   const fetchProduct = async () => {
     try {
-      const response = await axios.get(`http://localhost:3335/api/v1/products/${id}`)
-      setProduct(response.data)
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`http://localhost:3335/api/v1/products/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setProduct(response.data);
+      setError(null);
     } catch (error) {
-      console.error('Error fetching product:', error)
-      setError('Failed to fetch product. Please try again later.')
+      console.error('Error fetching product:', error);
+      setError('Failed to fetch product. Please try again later.');
     }
-  }
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     try {
+      const token = localStorage.getItem('token');
       if (id) {
-        await axios.put(`http://localhost:3335/api/v1/products/${id}`, product)
+        await axios.put(`http://localhost:3335/api/v1/products/${id}`, product, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
       } else {
-        await axios.post('http://localhost:3335/api/v1/products', product)
+        await axios.post('http://localhost:3335/api/v1/products', product, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
       }
-      navigate('/products')
+      navigate('/products');
     } catch (error) {
-      console.error('Error saving product:', error)
-      setError('Failed to save product. Please try again later.')
+      console.error('Error saving product:', error);
+      setError('Failed to save product. Please try again later.');
     }
-  }
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -89,12 +117,12 @@ export default function ProductForm() {
           <Form.Control type="number" name="quantity" value={product.quantity} onChange={handleChange} required />
         </Form.Group>
         <Form.Group className="mb-3">
-          <Form.Check 
-            type="checkbox" 
-            label="In Stock" 
-            name="inStock" 
-            checked={product.inStock} 
-            onChange={handleChange} 
+          <Form.Check
+            type="checkbox"
+            label="In Stock"
+            name="inStock"
+            checked={product.inStock}
+            onChange={handleChange}
           />
         </Form.Group>
         <Form.Group className="mb-3">
@@ -110,12 +138,12 @@ export default function ProductForm() {
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Expiry Date</Form.Label>
-          <Form.Control 
-            type="date" 
-            name="expiryDate" 
-            value={product.expiryDate ? product.expiryDate.split('T')[0] : ''} 
-            onChange={handleChange} 
-            required 
+          <Form.Control
+            type="date"
+            name="expiryDate"
+            value={product.expiryDate ? product.expiryDate.split('T')[0] : ''}
+            onChange={handleChange}
+            required
           />
         </Form.Group>
         <Form.Group className="mb-3">

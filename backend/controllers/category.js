@@ -16,8 +16,8 @@ const createCategory = async (req, res) => {
 
     // Enviar email de notificação para o administrador
     const mailOptions = {
-      from: 'paulo.gomes@uncisal.edu.br',
-      to: 'paulohenriquegomessilva1@gmail.com',
+      from: 'matheus.souza@academico.uncisal.edu.br',
+      to: 'mtstmd@gmail.com',
       subject: 'Nova categoria criada',
       text: `Uma nova categoria foi criada na aula do dia 18/11/2024: ${category.name}`,
       html: `<p>Uma nova categoria foi criada na aula do dia 18/11/2024: ${category.name}</p>`,
@@ -98,10 +98,23 @@ const updateCategory = async (req, res) => {
           },
         ],
       });
+
+      // Configurar email de notificação para o administrador
+      const mailOptions = {
+        from: 'matheus.souza@academico.uncisal.edu.br',
+        to: 'mtstmd@gmail.com',
+        subject: 'Categoria atualizada',
+        text: `A categoria "${updatedCategory.name}" foi atualizada com sucesso.`,
+        html: `<p>A categoria "<strong>${updatedCategory.name}</strong>" foi atualizada com sucesso.</p>`,
+      };
+
+      // Enviar email
+      await transporter.sendMail(mailOptions);
+
       return res.status(200).json(updatedCategory);
     }
 
-    throw new Error('Category not found ');
+    throw new Error('Category not found');
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -133,9 +146,9 @@ const deleteCategory = async (req, res) => {
 };
 
 module.exports = {
-  createCategory,
+  createCategory: [authMiddleware, createCategory],
   getAllCategories: [authMiddleware, getAllCategories],
-  getCategoryById,
-  updateCategory,
-  deleteCategory,
+  getCategoryById: [authMiddleware, getCategoryById],
+  updateCategory: [authMiddleware, updateCategory],
+  deleteCategory: [authMiddleware, deleteCategory]
 };
