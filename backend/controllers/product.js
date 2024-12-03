@@ -95,8 +95,15 @@ const getProductById = async (req, res) => {
  * @returns boolean
  */
 const updateProductById = [
+<<<<<<< HEAD
   upload.single('productImage'),
 
+=======
+  // Upload de arquivo em disco
+  upload.single('productImage'),
+
+  // Upload de arquivo em nuvem
+>>>>>>> 416b6b3b90495ec8d631e8619f13c5bbb7dae31d
   uploadToCloudinary,
 
   body('name').optional().notEmpty().withMessage('Nome não pode estar vazio'),
@@ -116,16 +123,31 @@ const updateProductById = [
         return res.status(404).send('Product not found');
       }
 
+<<<<<<< HEAD
       const updatedData = { ...req.body };
 
+=======
+      // Transformação de dados antes de atualizar
+      const updatedData = { ...req.body };
+
+      // Atualizar nome para minúsculo, se enviado
+>>>>>>> 416b6b3b90495ec8d631e8619f13c5bbb7dae31d
       if (updatedData.name) {
         updatedData.name = updatedData.name.toLowerCase();
       }
 
+<<<<<<< HEAD
       if (req.cloudinaryUrl) {
         updatedData.productImage = req.cloudinaryUrl;
       } else if (req.file) {
         updatedData.productImage = req.file.filename; 
+=======
+      // Atualizar a imagem do produto, se uma nova for enviada
+      if (req.cloudinaryUrl) {
+        updatedData.productImage = req.cloudinaryUrl; // Para upload em nuvem
+      } else if (req.file) {
+        updatedData.productImage = req.file.filename; // Para upload local
+>>>>>>> 416b6b3b90495ec8d631e8619f13c5bbb7dae31d
       }
 
       await product.update(updatedData);
@@ -136,6 +158,7 @@ const updateProductById = [
     }
   },
 ];
+
 
 
 /**
