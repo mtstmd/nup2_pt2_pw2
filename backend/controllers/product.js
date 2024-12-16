@@ -3,7 +3,10 @@ const multer = require('multer');
 const uploadToCloudinary = require('../middlewares/upload-cloud');
 const upload = multer({ storage: multer.memoryStorage() });
 const { v4: uuidv4 } = require('uuid');
+const authMiddleware = require('../middlewares/auth');
 const { body, validationResult } = require('express-validator');
+const redis = require('../config/redis'); // Configuração do Redis
+const Queue = require('bull');
 
 /**
  * Creates a new product
@@ -11,41 +14,45 @@ const { body, validationResult } = require('express-validator');
  * @param {*} res
  * @returns Object
  */
-const createProduct = [
-  // Upload de arquivo em disco
-  upload.single('productImage'),
 
-  // Upload de arquivo em nuvem
-  uploadToCloudinary,
-  body('name').notEmpty().withMessage('Nome é obrigatório'),
-  body('price').isNumeric().withMessage('O preço deve ser numérico'),
+const productQueue = new Queue('productQueue');
 
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    // Transformação dos dados
-    const transformedData = {
-      ...req.body,
-      id: uuidv4(),
-      name: req.body.name.toLowerCase(),
-      // productImage: req.file ? req.file.filename : null, // Upload de arquivo em disco
-      productImage: req.cloudinaryUrl || null, // Upload de arquivo em nuvem
-      expiryDate: new Date()
-    };
-
-    try {
-      const product = await Product.create(transformedData);
-      return res.status(201).json(
-        product
-      );
-    } catch (error) {
-      return res.status(500).json({ error: error.message });
-    }
+productQueue.process(async (job) => {
+  const { type, data } = job;
+  if (type === 'create') {
+    console.log(`Novo produto criado: ${data.name}`);
+  } else if (type === 'update') {
+    console.log(`Produto atualizado: ${data.name}`);
   }
-];
+});
+
+// Função de cache
+const cacheMiddleware = (key, duration) => async (req, res, next) => {
+  try {
+    const cachedData = await redis.get(key);
+    if (cachedData) {
+      return res.status(200).json(JSON.parse(cachedData));
+    }
+    res.cacheKey = key;
+    res.cacheDuration = duration;
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+const createProduct = async (req, res) => {
+  try {
+    const product = await Product.create({ ...req.body, id: uuidv4() });
+
+    // Adicionar à fila de processamento
+    await productQueue.add({ type: 'create', data: product });
+
+    return res.status(201).json(product);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
 
 
 /**
@@ -54,15 +61,18 @@ const createProduct = [
  * @param {*} res
  * @returns Object
  */
-const getAllProducts = async (req, res) => {
-  try {
-    const products = await Product.findAll({ order: [['createdAt', 'DESC']] })
-
-    return res.status(200).json( products )
-  } catch (error) {
-    return res.status(500).send(error.message)
-  }
-}
+const getAllProducts = [
+  cacheMiddleware('products', 3600),
+  async (req, res) => {
+    try {
+      const products = await Product.findAll({ order: [['createdAt', 'DESC']] });
+      await redis.setex(res.cacheKey, res.cacheDuration, JSON.stringify(products));
+      return res.status(200).json(products);
+    } catch (error) {
+      return res.status(500).send(error.message);
+    }
+  },
+];
 
 /**
  * Gets a single product by it's id
@@ -92,54 +102,25 @@ const getProductById = async (req, res) => {
  * @param {*} res
  * @returns boolean
  */
-const updateProductById = [
-  // Upload de arquivo em disco
-  upload.single('productImage'),
+const updateProductById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findOne({ where: { id: id } });
 
-  // Upload de arquivo em nuvem
-  uploadToCloudinary,
-
-  body('name').optional().notEmpty().withMessage('Nome não pode estar vazio'),
-  body('price').optional().isNumeric().withMessage('O preço deve ser numérico'),
-
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+    if (!product) {
+      return res.status(404).send('Product not found');
     }
 
-    try {
-      const { id } = req.params;
-      let product = await Product.findOne({ where: { id: id } });
+    await product.update(req.body);
 
-      if (!product) {
-        return res.status(404).send('Product not found');
-      }
+    // Adicionar à fila de atualização
+    await productQueue.add({ type: 'update', data: product });
 
-      // Transformação de dados antes de atualizar
-      const updatedData = { ...req.body };
-
-      // Atualizar nome para minúsculo, se enviado
-      if (updatedData.name) {
-        updatedData.name = updatedData.name.toLowerCase();
-      }
-
-      // Atualizar a imagem do produto, se uma nova for enviada
-      if (req.cloudinaryUrl) {
-        updatedData.productImage = req.cloudinaryUrl; // Para upload em nuvem
-      } else if (req.file) {
-        updatedData.productImage = req.file.filename; // Para upload local
-      }
-
-      await product.update(updatedData);
-
-      return res.status(200).json(product);
-    } catch (error) {
-      return res.status(500).send(error.message);
-    }
-  },
-];
-
+    return res.status(200).json(product);
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
 
 
 /**
@@ -167,9 +148,9 @@ const deleteProductById = async (req, res) => {
 }
 
 module.exports = {
-  createProduct,
-  getAllProducts,
-  getProductById,
-  deleteProductById,
-  updateProductById
+  createProduct: [authMiddleware, createProduct],
+  getAllProducts: [authMiddleware, getAllProducts],
+  getProductById: [authMiddleware, getProductById],
+  deleteProductById: [authMiddleware, deleteProductById],
+  updateProductById: [authMiddleware, updateProductById]
 }

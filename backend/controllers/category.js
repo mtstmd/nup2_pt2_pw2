@@ -2,7 +2,8 @@ const { Category, Product } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 const transporter = require('../config/nodemailer');
 const authMiddleware = require('../middlewares/auth');
-
+const redis = require('../config/redis'); // Configuração do Redis
+const Queue = require('bull');
 
 /**
  * Creates a new category
@@ -10,25 +11,50 @@ const authMiddleware = require('../middlewares/auth');
  * @param {*} res
  * @returns Object
  */
+const categoryQueue = new Queue('categoryQueue');
+
+categoryQueue.process(async (job) => {
+  const { type, data } = job;
+  if (type === 'create') {
+    const mailOptions = {
+      from: 'nicole.souza@academico.uncisal.edu.br',
+      to: 'nicole.tamarindo21@gmail.com',
+      subject: 'Nova categoria criada',
+      text: `Nova categoria criada: ${data.name}`,
+      html: `<p>Nova categoria criada: ${data.name}</p>`
+    };
+    await transporter.sendMail(mailOptions);
+  } else if (type === 'update') {
+    const mailOptions = {
+      from: 'nicole.souza@academico.uncisal.edu.br',
+      to: 'nicole.tamarindo21@gmail.com',
+      subject: 'Categoria atualizada',
+      text: `Categoria atualizada: ${data.name}`,
+      html: `<p>Categoria atualizada: ${data.name}</p>`
+    };
+    await transporter.sendMail(mailOptions);
+  }
+});
+
+const cacheMiddleware = (key, duration) => async (req, res, next) => {
+  try {
+    const cachedData = await redis.get(key);
+    if (cachedData) {
+      return res.status(200).json(JSON.parse(cachedData));
+    }
+    res.cacheKey = key;
+    res.cacheDuration = duration;
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
 const createCategory = async (req, res) => {
   try {
-    const category = await Category.create({...req.body, id: uuidv4()});
-
-    // Enviar email de notificação para o administrador
-    const mailOptions = {
-      from: 'matheus.souza@academico.uncisal.edu.br',
-      to: 'mtstmd@gmail.com',
-      subject: 'Nova categoria criada',
-      text: `Uma nova categoria foi criada na aula do dia 18/11/2024: ${category.name}`,
-      html: `<p>Uma nova categoria foi criada na aula do dia 18/11/2024: ${category.name}</p>`,
-    };
-
-    // Enviar email
-    await transporter.sendMail(mailOptions);
-
-    return res.status(201).json(
-      category,
-    );
+    const category = await Category.create({ ...req.body, id: uuidv4() });
+    await categoryQueue.add({ type: 'create', data: category });
+    return res.status(201).json(category);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -40,16 +66,18 @@ const createCategory = async (req, res) => {
  * @param {*} res
  * @returns Object
  */
-const getAllCategories = async (req, res) => {
-  try {
-    const categories = await Category.findAll({
-      order: [['createdAt', 'DESC']],
-    });
-    return res.status(200).json(categories);
-  } catch (error) {
-    return res.status(500).send(error.message);
-  }
-};
+const getAllCategories = [
+  cacheMiddleware('categories', 3600),
+  async (req, res) => {
+    try {
+      const categories = await Category.findAll({ order: [['createdAt', 'DESC']] });
+      await redis.setex(res.cacheKey, res.cacheDuration, JSON.stringify(categories));
+      return res.status(200).json(categories);
+    } catch (error) {
+      return res.status(500).send(error.message);
+    }
+  },
+];
 
 /**
  * Gets a single category by it's id
@@ -88,32 +116,11 @@ const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
     const [updated] = await Category.update(req.body, { where: { id: id } });
-
     if (updated) {
-      const updatedCategory = await Category.findOne({
-        where: { id: id },
-        include: [
-          {
-            model: Product,
-          },
-        ],
-      });
-
-      // Configurar email de notificação para o administrador
-      const mailOptions = {
-        from: 'matheus.souza@academico.uncisal.edu.br',
-        to: 'mtstmd@gmail.com',
-        subject: 'Categoria atualizada',
-        text: `A categoria "${updatedCategory.name}" foi atualizada com sucesso.`,
-        html: `<p>A categoria "<strong>${updatedCategory.name}</strong>" foi atualizada com sucesso.</p>`,
-      };
-
-      // Enviar email
-      await transporter.sendMail(mailOptions);
-
+      const updatedCategory = await Category.findOne({ where: { id: id } });
+      await categoryQueue.add({ type: 'update', data: updatedCategory });
       return res.status(200).json(updatedCategory);
     }
-
     throw new Error('Category not found');
   } catch (error) {
     return res.status(500).send(error.message);
@@ -146,9 +153,9 @@ const deleteCategory = async (req, res) => {
 };
 
 module.exports = {
-  createCategory,
+  createCategory: [authMiddleware, createCategory],
   getAllCategories: [authMiddleware, getAllCategories],
-  getCategoryById,
-  updateCategory,
-  deleteCategory,
+  getCategoryById: [authMiddleware, getCategoryById],
+  updateCategory: [authMiddleware, updateCategory],
+  deleteCategory: [authMiddleware, deleteCategory],
 };
