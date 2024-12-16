@@ -5,37 +5,58 @@ import axios from 'axios'
 
 export default function CategoryForm() {
   const [category, setCategory] = useState({ name: '' })
+  const [error, setError] = useState(null) 
   const { id } = useParams()
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (id) {
-      fetchCategory()
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login', { state: { error: 'Você precisa estar autenticado para acessar esta página.' } });
+    } else if (id) {
+      fetchCategory();
     }
-  }, [id])
+  }, [id, navigate]);
 
   const fetchCategory = async () => {
     try {
-      const response = await axios.get(`http://localhost:3335/api/v1/categories/${id}`)
-      setCategory(response.data)
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`http://localhost:3335/api/v1/categories/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setCategory(response.data);
+      setError(null); 
     } catch (error) {
-      console.error('Error fetching category:', error)
+      console.error('Error fetching category:', error);
+      setError('Failed to fetch category. Please try again later.');
     }
-  }
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     try {
+      const token = localStorage.getItem('token');
       if (id) {
-        await axios.put(`http://localhost:3335/api/v1/categories/${id}`, category)
+        await axios.put(`http://localhost:3335/api/v1/categories/${id}`, category, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
       } else {
-        await axios.post('http://localhost:3335/api/v1/categories', category)
+        await axios.post('http://localhost:3335/api/v1/categories', category, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
       }
-      navigate('/categories')
+      navigate('/categories');
     } catch (error) {
-      console.error('Error saving category:', error)
+      console.error('Error saving category:', error);
+      setError('Failed to save category. Please try again later.');
     }
-  }
+  };
 
   const handleChange = (e) => {
     setCategory({ ...category, [e.target.name]: e.target.value })

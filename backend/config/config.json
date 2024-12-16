@@ -8,8 +8,13 @@
   },
   "test": {
     "username": "postgres",
+<<<<<<< HEAD
+    "password": "12345",
+    "database": "team_project_test",
+=======
     "password": "postgres",
     "database": "team_project",
+>>>>>>> 416b6b3b90495ec8d631e8619f13c5bbb7dae31d
     "host": "127.0.0.1",
     "dialect": "postgres"
   },

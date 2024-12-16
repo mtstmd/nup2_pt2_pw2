@@ -5,8 +5,13 @@ const upload = multer({ storage: multer.memoryStorage() });
 const { v4: uuidv4 } = require('uuid');
 const authMiddleware = require('../middlewares/auth');
 const { body, validationResult } = require('express-validator');
+<<<<<<< HEAD
 const redis = require('../config/redis'); // Configuração do Redis
 const Queue = require('bull');
+=======
+const authMiddleware = require('../middlewares/auth');
+
+>>>>>>> 3230ad1706d93814d7d4a2f08d5775f0181a4f26
 
 /**
  * Creates a new product
@@ -102,6 +107,7 @@ const getProductById = async (req, res) => {
  * @param {*} res
  * @returns boolean
  */
+<<<<<<< HEAD
 const updateProductById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -109,12 +115,75 @@ const updateProductById = async (req, res) => {
 
     if (!product) {
       return res.status(404).send('Product not found');
+=======
+const updateProductById = [
+<<<<<<< HEAD
+  upload.single('productImage'),
+
+=======
+  // Upload de arquivo em disco
+  upload.single('productImage'),
+
+  // Upload de arquivo em nuvem
+>>>>>>> 416b6b3b90495ec8d631e8619f13c5bbb7dae31d
+  uploadToCloudinary,
+
+  body('name').optional().notEmpty().withMessage('Nome não pode estar vazio'),
+  body('price').optional().isNumeric().withMessage('O preço deve ser numérico'),
+
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+>>>>>>> 3230ad1706d93814d7d4a2f08d5775f0181a4f26
     }
 
     await product.update(req.body);
 
+<<<<<<< HEAD
     // Adicionar à fila de atualização
     await productQueue.add({ type: 'update', data: product });
+=======
+      if (!product) {
+        return res.status(404).send('Product not found');
+      }
+
+<<<<<<< HEAD
+      const updatedData = { ...req.body };
+
+=======
+      // Transformação de dados antes de atualizar
+      const updatedData = { ...req.body };
+
+      // Atualizar nome para minúsculo, se enviado
+>>>>>>> 416b6b3b90495ec8d631e8619f13c5bbb7dae31d
+      if (updatedData.name) {
+        updatedData.name = updatedData.name.toLowerCase();
+      }
+
+<<<<<<< HEAD
+      if (req.cloudinaryUrl) {
+        updatedData.productImage = req.cloudinaryUrl;
+      } else if (req.file) {
+        updatedData.productImage = req.file.filename; 
+=======
+      // Atualizar a imagem do produto, se uma nova for enviada
+      if (req.cloudinaryUrl) {
+        updatedData.productImage = req.cloudinaryUrl; // Para upload em nuvem
+      } else if (req.file) {
+        updatedData.productImage = req.file.filename; // Para upload local
+>>>>>>> 416b6b3b90495ec8d631e8619f13c5bbb7dae31d
+      }
+
+      await product.update(updatedData);
+
+      return res.status(200).json(product);
+    } catch (error) {
+      return res.status(500).send(error.message);
+    }
+  },
+];
+>>>>>>> 3230ad1706d93814d7d4a2f08d5775f0181a4f26
 
     return res.status(200).json(product);
   } catch (error) {

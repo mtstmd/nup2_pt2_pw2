@@ -1,6 +1,7 @@
 const { User } = require('../models');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const { v4: uuidv4 } = require('uuid');
 const { body, validationResult } = require('express-validator');
 
 const signup = [
@@ -24,7 +25,7 @@ const signup = [
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      const user = await User.create({ username, password: hashedPassword });
+      const user = await User.create({ id: uuidv4(), username, password: hashedPassword });
 
       const token = jwt.sign(
         { 

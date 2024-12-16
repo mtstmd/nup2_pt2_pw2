@@ -157,5 +157,9 @@ module.exports = {
   getAllCategories: [authMiddleware, getAllCategories],
   getCategoryById: [authMiddleware, getCategoryById],
   updateCategory: [authMiddleware, updateCategory],
+<<<<<<< HEAD
   deleteCategory: [authMiddleware, deleteCategory],
+=======
+  deleteCategory: [authMiddleware, deleteCategory]
+>>>>>>> 3230ad1706d93814d7d4a2f08d5775f0181a4f26
 };
